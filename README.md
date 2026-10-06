@@ -2,6 +2,13 @@
 
 A full-stack project by **Khwaish Yadav** recreating the AWS Route 53 management console and its core hosted-zone and DNS-record workflows. It uses a Next.js TypeScript frontend, FastAPI backend, and SQLite database. Production can use a persistent Turso/libSQL database through the same SQL repository. DNS changes are simulated; the application does not publish real DNS records.
 
+## Live demo
+
+- Application: https://aws-route53-clone-khwaish2.vercel.app
+- API health: https://khwaish-route53-api-zmg9.onrender.com/api/health
+
+Use the project account listed in **Quick start** to sign in. The backend runs on Render's free tier, so the first request after inactivity can take up to a minute while the service wakes up.
+
 ## Features
 
 - Mocked login/logout with durable, HTTP-only cookie sessions
@@ -88,7 +95,7 @@ Browser
           SQLite
 ```
 
-The browser talks directly to FastAPI using `NEXT_PUBLIC_API_URL`. FastAPI sets an HTTP-only session cookie and applies authentication to all zone and record endpoints. SQLite uses foreign keys and cascading deletes so deleting a hosted zone also removes its records.
+In production, the browser calls same-origin `/api` paths and Next.js proxies them to FastAPI using the server-only `BACKEND_API_URL`. Local development can use `NEXT_PUBLIC_API_URL` to call FastAPI directly. FastAPI sets an HTTP-only session cookie and applies authentication to all zone and record endpoints. SQLite uses foreign keys and cascading deletes so deleting a hosted zone also removes its records.
 
 ## Database schema
 
