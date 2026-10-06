@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.database import db, initialize
 
 
 def test_zone_and_record_workflow():
@@ -144,3 +145,18 @@ def test_supported_record_types_pagination_and_protected_records():
         ).status_code == 400
         assert client.get(f"/api/zones/{zone_id}/export?format=xml").status_code == 422
         assert client.delete(f"/api/zones/{zone_id}").status_code == 204
+
+
+def test_libsql_adapter_uses_the_same_database_contract(tmp_path, monkeypatch):
+    database_path = tmp_path / "libsql-test.db"
+    monkeypatch.setenv("TURSO_DATABASE_URL", str(database_path))
+    monkeypatch.delenv("TURSO_AUTH_TOKEN", raising=False)
+    initialize()
+    with db() as connection:
+        user = connection.execute(
+            "SELECT id, email, display_name FROM users WHERE id = ?", (1,)
+        ).fetchone()
+        assert user is not None
+        assert user[0] == 1
+        assert user["email"] == "khwaish.yadav@route53.local"
+        assert dict(user)["display_name"] == "Khwaish Yadav"

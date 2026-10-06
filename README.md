@@ -1,6 +1,6 @@
 # Khwaish Yadav — AWS Route 53 Clone
 
-A full-stack project by **Khwaish Yadav** recreating the AWS Route 53 management console and its core hosted-zone and DNS-record workflows. It uses a Next.js TypeScript frontend, FastAPI backend, and SQLite database. DNS changes are simulated; the application does not publish real DNS records.
+A full-stack project by **Khwaish Yadav** recreating the AWS Route 53 management console and its core hosted-zone and DNS-record workflows. It uses a Next.js TypeScript frontend, FastAPI backend, and SQLite database. Production can use a persistent Turso/libSQL database through the same SQL repository. DNS changes are simulated; the application does not publish real DNS records.
 
 ## Features
 
@@ -66,7 +66,7 @@ Email: khwaish.yadav@route53.local
 Password: password
 ```
 
-The SQLite file is created automatically at `backend/route53.db`. Set `ROUTE53_DB_PATH` to use another location.
+The SQLite file is created automatically at `backend/route53.db`. Set `ROUTE53_DB_PATH` to use another location. When `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` are configured, the same repository uses the persistent SQLite-compatible Turso database instead.
 
 ## Architecture
 
@@ -134,18 +134,17 @@ npm run typecheck
 npm run build
 ```
 
-## Deployment
+## Free deployment
 
-The repository includes a root-level `render.yaml` Blueprint for deploying both services to Render. The API service mounts a persistent disk at `/var/data`, and the frontend runs as a Next.js Node web service.
+The included `render.yaml` deploys the FastAPI backend on Render's free web-service plan. Persistent production data is stored on Turso's free SQLite-compatible service because free Render instances have an ephemeral filesystem.
 
-During Blueprint creation, provide these two values when Render prompts for them:
+1. Create a free Turso database and token.
+2. In Render, create a Blueprint from this repository and provide `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, and the final Vercel origin as `FRONTEND_ORIGINS`.
+3. In Vercel, import the repository and set the project root to `frontend`.
+4. Set Vercel's `BACKEND_API_URL` to the Render service origin, for example `https://khwaish-route53-api.onrender.com`. Do not set `NEXT_PUBLIC_API_URL` in production; the browser uses `/api`, which Next.js securely proxies to FastAPI.
+5. Redeploy Vercel after setting the backend URL, then verify login and CRUD persistence.
 
-- `FRONTEND_ORIGINS`: the final frontend origin, for example `https://khwaish-route53-console.onrender.com`
-- `NEXT_PUBLIC_API_URL`: the final API base URL, for example `https://khwaish-route53-api.onrender.com/api`
-
-After Render assigns both URLs, confirm the values and redeploy both services. `NEXT_PUBLIC_API_URL` is embedded during the frontend build. The Blueprint enables secure HTTPS session cookies and stores `route53.db` on the API service's persistent disk.
-
-Persistent disks require a compatible paid Render service. If the app is later scaled to multiple API instances, replace SQLite with a shared SQL database.
+The proxy keeps authentication first-party from the browser's perspective. Render free services sleep after inactivity, so the first API request after an idle period can take approximately one minute.
 
 ## Project layout
 

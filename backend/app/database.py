@@ -4,11 +4,80 @@ import os
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any, Iterator
 
 DB_PATH = Path(os.getenv("ROUTE53_DB_PATH", Path(__file__).resolve().parent.parent / "route53.db"))
 
 
-def connect() -> sqlite3.Connection:
+class LibsqlRow:
+    """Provide the mapping and positional access used by sqlite3.Row."""
+
+    def __init__(self, columns: list[str], values: tuple[Any, ...]):
+        self._columns = columns
+        self._values = values
+        self._mapping = dict(zip(columns, values, strict=True))
+
+    def __getitem__(self, key: str | int) -> Any:
+        return self._values[key] if isinstance(key, int) else self._mapping[key]
+
+    def keys(self):
+        return self._mapping.keys()
+
+
+class LibsqlCursor:
+    def __init__(self, cursor: Any):
+        self._cursor = cursor
+
+    def _row(self, values: tuple[Any, ...] | None) -> LibsqlRow | None:
+        if values is None:
+            return None
+        columns = [column[0] for column in self._cursor.description or []]
+        return LibsqlRow(columns, values)
+
+    def fetchone(self) -> LibsqlRow | None:
+        return self._row(self._cursor.fetchone())
+
+    def fetchall(self) -> list[LibsqlRow]:
+        return [row for values in self._cursor.fetchall() if (row := self._row(values)) is not None]
+
+
+class LibsqlConnection:
+    """Adapt libSQL's DB-API connection to the sqlite3 calls used by the app."""
+
+    def __init__(self, connection: Any):
+        self._connection = connection
+
+    def execute(self, sql: str, parameters: Any = ()) -> LibsqlCursor:
+        return LibsqlCursor(self._connection.execute(sql, parameters))
+
+    def executemany(self, sql: str, parameters: Any) -> LibsqlCursor:
+        return LibsqlCursor(self._connection.executemany(sql, parameters))
+
+    def executescript(self, sql: str) -> LibsqlCursor:
+        return LibsqlCursor(self._connection.executescript(sql))
+
+    def commit(self) -> None:
+        self._connection.commit()
+
+    def rollback(self) -> None:
+        self._connection.rollback()
+
+    def close(self) -> None:
+        self._connection.close()
+
+
+def connect() -> sqlite3.Connection | LibsqlConnection:
+    turso_url = os.getenv("TURSO_DATABASE_URL", "").strip()
+    if turso_url:
+        turso_token = os.getenv("TURSO_AUTH_TOKEN", "").strip()
+        if not turso_token and turso_url.startswith(("libsql://", "https://")):
+            raise RuntimeError("TURSO_AUTH_TOKEN is required for a remote Turso database")
+        import libsql
+
+        connection = LibsqlConnection(libsql.connect(database=turso_url, auth_token=turso_token))
+        connection.execute("PRAGMA foreign_keys = ON")
+        return connection
+
     connection = sqlite3.connect(DB_PATH, check_same_thread=False)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
@@ -17,7 +86,7 @@ def connect() -> sqlite3.Connection:
 
 
 @contextmanager
-def db():
+def db() -> Iterator[sqlite3.Connection | LibsqlConnection]:
     connection = connect()
     try:
         yield connection
