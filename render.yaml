@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: khwaish-route53-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: ROUTE53_DB_PATH
+        value: /var/data/route53.db
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: FRONTEND_ORIGINS
+        sync: false
+    disk:
+      name: route53-data
+      mountPath: /var/data
+      sizeGB: 1
+
+  - type: web
+    name: khwaish-route53-console
+    runtime: node
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start -- -H 0.0.0.0 -p $PORT
+    healthCheckPath: /login
+    envVars:
+      - key: NODE_VERSION
+        value: 22.18.0
+      - key: NEXT_PUBLIC_API_URL
+        sync: false

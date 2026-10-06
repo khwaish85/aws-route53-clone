@@ -1,0 +1,19 @@
+# Dependencies and build output
+node_modules/
+.next/
+*.tsbuildinfo
+next-env.d.ts
+dist/
+out/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# Runtime data and local configuration
+*.db
+*.db-shm
+*.db-wal
+.env
+.env.local
+.DS_Store
